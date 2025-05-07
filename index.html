@@ -288,7 +288,7 @@
     <div class="container">
         <div class="weather-container">
             <div class="search-box">
-                <input type="text" id="city-input" placeholder="Введите название города">
+                <input type="text" id="city-input" placeholder="Введите название города" maxlength="200">
                 <button id="search-btn">Поиск</button>
             </div>
             <div id="city-list" class="city-list" style="display: none;">
@@ -348,6 +348,23 @@
             const weatherInfo = document.getElementById('weather-info');
             const errorMessage = document.getElementById('error-message');
             const loading = document.getElementById('loading');
+
+            // Функция для обработки ввода в поле города
+            function handleCityInput(e) {
+                // Запрет на ввод пробела первым символом
+                if (e.target.value === ' ' && e.target.selectionStart === 1) {
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Замена нескольких пробелов подряд на один
+                e.target.value = e.target.value.replace(/\s{2,}/g, ' ');
+                
+                // Ограничение длины до 200 символов
+                if (e.target.value.length > 200) {
+                    e.target.value = e.target.value.substring(0, 200);
+                }
+            }
 
             // Функция для отображения погоды
             function displayWeather(data) {
@@ -468,6 +485,15 @@
                 cityList.style.display = 'block';
             }
 
+            // Обработчик ввода в поле города
+            cityInput.addEventListener('input', handleCityInput);
+            cityInput.addEventListener('keydown', function(e) {
+                // Запрет на ввод пробела первым символом
+                if (e.key === ' ' && this.selectionStart === 0) {
+                    e.preventDefault();
+                }
+            });
+
             // Обработчик поиска
             searchBtn.addEventListener('click', () => {
                 const city = cityInput.value.trim();
@@ -496,4 +522,4 @@
     </script>
 </body>
 
-</html> 
+</html>
