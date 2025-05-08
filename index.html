@@ -156,12 +156,70 @@
             width: 100%;
         }
 
+        /* Стили для прогноза на 5 дней */
+        .forecast-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .forecast-container.active {
+            display: block;
+        }
+
+        .forecast-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #4f5fed;
+        }
+
+        .forecast-days {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .forecast-day {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .forecast-day i {
+            font-size: 24px;
+            color: #4f5fed;
+            margin: 10px 0;
+        }
+
+        .forecast-date {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .forecast-temp {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+
+        .temp-max {
+            color: #e74c3c;
+        }
+
+        .temp-min {
+            color: #3498db;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
             }
 
             .weather-details {
+                grid-template-columns: 1fr;
+            }
+
+            .forecast-days {
                 grid-template-columns: 1fr;
             }
 
@@ -330,6 +388,12 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Прогноз на 5 дней -->
+            <div id="forecast-container" class="forecast-container">
+                <h3 class="forecast-title">Прогноз на 5 дней</h3>
+                <div id="forecast-days" class="forecast-days"></div>
+            </div>
         </div>
     </div>
 
@@ -346,6 +410,7 @@
             const cityInput = document.getElementById('city-input');
             const searchBtn = document.getElementById('search-btn');
             const weatherInfo = document.getElementById('weather-info');
+            const forecastContainer = document.getElementById('forecast-container');
             const errorMessage = document.getElementById('error-message');
             const loading = document.getElementById('loading');
 
@@ -391,6 +456,68 @@
 
                 weatherInfo.classList.add('active');
                 errorMessage.style.display = 'none';
+                
+                // Получаем прогноз на 5 дней
+                getForecast(data.coord.lat, data.coord.lon);
+            }
+
+            // Функция для отображения прогноза на 5 дней
+            function displayForecast(forecastData) {
+                const forecastDays = document.getElementById('forecast-days');
+                forecastDays.innerHTML = '';
+                
+                // Группируем прогноз по дням
+                const dailyForecast = {};
+                forecastData.list.forEach(item => {
+                    const date = new Date(item.dt * 1000);
+                    const dateKey = date.toLocaleDateString('ru-RU', { weekday: 'long', month: 'short', day: 'numeric' });
+                    
+                    if (!dailyForecast[dateKey]) {
+                        dailyForecast[dateKey] = {
+                            date: dateKey,
+                            temps: [],
+                            icons: [],
+                            descriptions: []
+                        };
+                    }
+                    
+                    dailyForecast[dateKey].temps.push(item.main.temp);
+                    dailyForecast[dateKey].icons.push(item.weather[0].icon);
+                    dailyForecast[dateKey].descriptions.push(item.weather[0].description);
+                });
+                
+                // Отображаем прогноз для каждого дня (первые 5 дней)
+                Object.keys(dailyForecast).slice(0, 5).forEach(dateKey => {
+                    const day = dailyForecast[dateKey];
+                    const maxTemp = Math.round(Math.max(...day.temps));
+                    const minTemp = Math.round(Math.min(...day.temps));
+                    
+                    // Находим наиболее частую иконку и описание
+                    const mostCommonIcon = mode(day.icons);
+                    const mostCommonDescription = mode(day.descriptions);
+                    
+                    const forecastDay = document.createElement('div');
+                    forecastDay.className = 'forecast-day';
+                    forecastDay.innerHTML = `
+                        <div class="forecast-date">${dateKey}</div>
+                        <i class="fas ${getWeatherIcon(mostCommonIcon)}"></i>
+                        <div class="forecast-description">${mostCommonDescription}</div>
+                        <div class="forecast-temp">
+                            <span class="temp-max">${maxTemp}°</span>
+                            <span class="temp-min">${minTemp}°</span>
+                        </div>
+                    `;
+                    forecastDays.appendChild(forecastDay);
+                });
+                
+                forecastContainer.classList.add('active');
+            }
+
+            // Вспомогательная функция для нахождения моды (наиболее часто встречающегося значения)
+            function mode(arr) {
+                return arr.sort((a, b) =>
+                    arr.filter(v => v === a).length - arr.filter(v => v === b).length
+                ).pop();
             }
 
             // Функция для получения иконки погоды
@@ -418,11 +545,12 @@
                 return iconMap[iconCode] || 'fa-cloud';
             }
 
-            // Функция для получения погоды
+            // Функция для получения текущей погоды
             async function getWeather(city) {
                 try {
                     loading.classList.add('active');
                     weatherInfo.classList.remove('active');
+                    forecastContainer.classList.remove('active');
                     errorMessage.style.display = 'none';
                     document.getElementById('city-list').style.display = 'none';
 
@@ -457,8 +585,29 @@
                     errorMessage.textContent = error.message;
                     errorMessage.style.display = 'block';
                     weatherInfo.classList.remove('active');
+                    forecastContainer.classList.remove('active');
                 } finally {
                     loading.classList.remove('active');
+                }
+            }
+
+            // Функция для получения прогноза на 5 дней
+            async function getForecast(lat, lon) {
+                try {
+                    const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&lang=ru&appid=${API_KEY}`;
+                    console.log('Requesting forecast URL:', url);
+
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(`Ошибка прогноза: ${data.message || 'Неизвестная ошибка'}`);
+                    }
+
+                    displayForecast(data);
+                } catch (error) {
+                    console.error('Forecast error:', error);
+                    // Не показываем ошибку пользователю, так как основная погода уже загружена
                 }
             }
 
